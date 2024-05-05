@@ -139,6 +139,11 @@ namespace GoalBar
                                                     goal.name = elGoal.Value;
                                                 }
 
+                                                if (elGoal.Name.ToString() == "show")
+                                                {
+                                                    goal.show = (elGoal.Value == "1");
+                                                }
+
                                                 if (elGoal.Name.ToString() == "min")
                                                 {
                                                     goal.min = Int32.Parse(elGoal.Value);
@@ -204,6 +209,7 @@ namespace GoalBar
                 XElement itemGoal = new XElement("goal");
 
                 itemGoal.Add(new XElement("name", goal.name));
+                itemGoal.Add(new XElement("show", goal.show ? "1" : "0"));
                 itemGoal.Add(new XElement("min", goal.min.ToString()));
                 itemGoal.Add(new XElement("max", goal.max.ToString()));
                 itemGoal.Add(new XElement("value", goal.value.ToString()));

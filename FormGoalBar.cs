@@ -1,6 +1,8 @@
 using Microsoft.VisualBasic.ApplicationServices;
 using Microsoft.VisualBasic.Devices;
+using System.Diagnostics;
 using System.Drawing;
+using System.Xml.Linq;
 
 namespace GoalBar
 {
@@ -84,17 +86,17 @@ namespace GoalBar
 
             Graphics g = e.Graphics;
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
- 
-            Brush brushBarBackground = new SolidBrush(Color.FromArgb(30, 0, 0, 0));
 
-            /*
-            // area
-            Rectangle rectangleT = new Rectangle(0, 0, w, h);
-            g.FillRectangle(new SolidBrush(Color.FromArgb(255, 0, 0, 0)), rectangleT);
-            */
+            Brush brushBarBackground = new SolidBrush(Color.FromArgb(30, 0, 0, 0));
 
             foreach (Goal goal in Program.config.goals)
             {
+
+                if (!goal.show)
+                {
+                    continue;
+                }
+
                 int gL = 10;
                 int gT = top;
                 int gW = w - 40;
@@ -117,7 +119,11 @@ namespace GoalBar
                     (barY <= mouseY) && (mouseY <= barY + barHeight))
                 {
                     selectedGoal = goal;
-                    valueChange = true;
+
+                    if (mouseButton == 1)
+                    {
+                        valueChange = true;
+                    }
                 }
 
                 if (this.valueChange && selectedGoal != null && selectedGoal == goal && valueChange)
@@ -143,7 +149,7 @@ namespace GoalBar
                 }
 
                 // partial bar
-                int barWidth2 = (int)(barWidth * ( (float)(goal.value - goal.min) / (goal.max - goal.min)    ));
+                int barWidth2 = (int)(barWidth * ((float)(goal.value - goal.min) / (goal.max - goal.min)));
 
                 if (barWidth2 < 0)
                 {
@@ -163,7 +169,7 @@ namespace GoalBar
                 Brush brushBar = new SolidBrush(Color.FromArgb(
                     255,
                     red,
-                    green, 
+                    green,
                     0
                 ));
 
@@ -225,6 +231,7 @@ namespace GoalBar
         public bool mouseUp = false;
         public int mouseUpX = 0;
         public int mouseUpY = 0;
+        public int mouseButton = 0;
 
 
 
@@ -239,6 +246,22 @@ namespace GoalBar
             this.mouseDown = true;
             this.mouseMove = false;
             this.mouseUp = false;
+
+            switch (e.Button)
+            {
+                case MouseButtons.Left:
+                    mouseButton = 1;
+                    break;
+                case MouseButtons.Right:
+                    mouseButton = 2;
+                    break;
+                case MouseButtons.Middle:
+                    mouseButton = 3;
+                    break;
+                default:
+                    mouseButton = 4;
+                    break;
+            }
 
             this.Invalidate();
         }
@@ -266,7 +289,7 @@ namespace GoalBar
                 }
             }
 
-            selectedGoal = null;
+            valueChange = false;
 
             Point clientPoint = this.PointToClient(MousePosition);
             mouseUpX = clientPoint.X;
@@ -281,7 +304,138 @@ namespace GoalBar
 
         private void FormGoalBar_Activated(object sender, EventArgs e)
         {
-            
+
+        }
+
+        private void closeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+
+        private void openToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = Program.config.configPath,
+                    UseShellExecute = true
+                };
+
+                Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                Program.log.write(ex.Message);
+            }
+        }
+
+        private void addGoalToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Goal goal = new Goal();
+            goal.name = "New goal";
+            goal.min = 0;
+            goal.max = 100;
+            goal.value = 50;
+
+            if (selectedGoal != null)
+            {
+                int index = Program.config.goals.IndexOf(selectedGoal);
+                Program.config.goals.Insert(index+1, goal);
+            }
+            else
+            {
+                Program.config.goals.Add(goal);
+            }
+
+            this.update();
+        }
+
+        private void removeGoalToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+
+            if (selectedGoal != null)
+            {
+                int index = Program.config.goals.IndexOf(selectedGoal);
+                Program.config.goals.RemoveAt(index);
+                selectedGoal = null;
+                this.update();
+            }
+
+        }
+
+        private void changeNameToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (selectedGoal != null)
+            {
+                GoalOptions form = new GoalOptions();
+                form.SetGoalName(selectedGoal.name);
+                form.ShowDialog();
+                string newName = form.GetGoalName();
+                selectedGoal.name = newName;
+
+                this.update();
+            }
+        }
+
+        private void moveUpToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (selectedGoal != null)
+            {
+                int index = Program.config.goals.IndexOf(selectedGoal);
+
+                int nextVisible = index;
+                for (int i = index -1; i >= 0; i--)
+                {
+                    if (Program.config.goals[i].show)
+                    {
+                        nextVisible = i;
+                        break;
+                    }
+                }
+
+                if ((0 < index) && (index < Program.config.goals.Count))
+                {
+
+                    Program.config.goals.RemoveAt(index);
+                    Program.config.goals.Insert(nextVisible, selectedGoal);
+                }
+
+                this.update();
+            }
+        }
+
+        private void moveDownToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (selectedGoal != null)
+            {
+                int index = Program.config.goals.IndexOf(selectedGoal);
+
+                int nextVisible = index;
+                for (int i = index+1; i< Program.config.goals.Count; i++) {
+                    if (Program.config.goals[i].show) {
+                        nextVisible = i;
+                        break;
+                    }
+                }
+
+                if ((-1< index) && (index < Program.config.goals.Count-1)) {
+                    
+                    Program.config.goals.RemoveAt(index);
+                    Program.config.goals.Insert(nextVisible, selectedGoal);
+                }
+
+                this.update();
+            }
+        }
+        public void update()
+        {
+            this.Invalidate(true);
+
+            if (!timerConfigUpdate.Enabled)
+            {
+                timerConfigUpdate.Enabled = true;
+            }
         }
     }
 }
